@@ -10,6 +10,15 @@ class Read_dump:
 
 	def read_dump(file_name):
 		cmd = 'sudo tcpdump -v -nn -r /var/log/snort/'
+		#cmd = 'sudo tcpdump -v -nn -r '
+		cmd = cmd + file_name
+		outputlist = ""
+		temp = subprocess.Popen(cmd.split(' '), stdout = subprocess.PIPE)
+		
+		outputlist = temp.communicate()
+		return outputlist
+	def read_tcpdump(filepath):
+		cmd  = 'sudo tcpdump -v -nn -r '
 		cmd = cmd + file_name
 		outputlist = ""
 		temp = subprocess.Popen(cmd.split(' '), stdout = subprocess.PIPE)
@@ -60,7 +69,52 @@ class Read_dump:
 						
 						lst_curr = curr
 					a = len(Read_dump.final_list)-1
-			await asyncio.sleep(1)				
+			await asyncio.sleep(1)	
+	async def get_tcpdump(filepath, func):
+		curr = ""
+		lst_curr = ""
+		f_size = 0
+		strLen = 0;
+		a = 0
+		while(1):
+			if(os.stat(filepath).st_size > f_size):
+				f_size = os.stat(filepath).st_size
+				outputlist = Read_dump.read_tcpdump(filepath)
+				decodedList = outputlist[0].decode("utf-8")
+				if(len(decodedList)>strLen):
+					func(decodedList[strLen:])
+					strLen = len(decodedList)
+				date_time = re.findall('\d\d:\d\d:\d\d.\d\d\d\d\d\d', decodedList)
+				output_list = re.split('\d\d:\d\d:\d\d.\d\d\d\d\d\d',decodedList)
+				output_list = list(zip(date_time, output_list[1:]))
+				
+				if(len(Read_dump.final_list)<len(output_list)):
+					if(curr != ""):
+						curr = output_list[-1][0]
+						
+						required_list = []
+						if(curr != lst_curr):
+							#print("length of the list is",len(output_list))
+							for i in output_list[-1::-1]:
+								if(i[0] != lst_curr):
+										required_list.append(i)
+								else:
+									lst_curr = curr
+									Read_dump.final_list.extend(required_list[-1::-1])
+									break
+						
+						
+					else:
+						
+						
+						curr = output_list[-1][0]
+						Read_dump.final_list.extend(output_list[a:])
+						
+						
+						lst_curr = curr
+					a = len(Read_dump.final_list)-1
+			await asyncio.sleep(1)
+					
 
 if __name__ == '__main__':
 	if len(sys.argv) == 2:

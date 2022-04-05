@@ -7,6 +7,7 @@ import asyncio
 import multiprocessing as mp
 import threading as mt
 import os
+import datetime
 
 
 alert_file_name = "Alert_logs.log"
@@ -22,15 +23,30 @@ class Filter_alert:
 	alert_logs = [] #to store the alert logs fetched from reading alert logs file.
 	snort_log_file = ''
 	alert_log_file = ''
+	tcpdump_log_file = ''
 	
 	
 	def updateAlertFile(logs):
-		with open(alert_file_name, 'a') as file:
-			file.write(logs)
+		td = datetime.datetime.now
+		with open(alert_file_name, 'a') as f:
+			for i in logs.split('\n'):
+				if(len(i) != 0 and  (i[0] == " " or i[0] == "\t")):
+					f.write(i.strip()+" ")
+				elif len(i) != 0: 
+					f.write("\n")
+					f.write(td().strftime("%m/%d")+"-")
+					f.write(i+" ")
 	
 	def updateLogFile(logs):
-		with open(log_file_name, 'a') as file:
-			file.write(logs)
+		td = datetime.datetime.now
+		with open(log_file_name, 'a') as f:
+			for i in logs.split('\n'):
+				if(len(i) != 0 and  (i[0] == " " or i[0] == "\t")):
+					f.write(i.strip()+" ")
+				elif len(i) != 0: 
+					f.write("\n")
+					f.write(td().strftime("%m/%d")+"-")
+					f.write(i+" ")
 	async def get_alert_logs(file_name):
 		a = 0
 		strLen = 0;
@@ -77,7 +93,7 @@ class Filter_alert:
 						filtered_log_list.append(read_dump.Read_dump.final_list[a])
 						Filter_alert.filtered_logs.append(read_dump.Read_dump.final_list[a])
 						a = a+1
-						print("UnnnMatched "+read_dump.Read_dump.final_list[a-1][1]+"--"+Filter_alert.alert_logs[b][1])
+						print("UnMatched "+read_dump.Read_dump.final_list[a-1][1]+"--"+Filter_alert.alert_logs[b][1])
 				#Filter_alert.filtered_logs.extend(read_dump.Read_dump.final_list[a:])
 				#if(a<len(log_list)-1):
 					#filtered_log_list.extend(log_list[a+1:])
@@ -99,7 +115,8 @@ class Filter_alert:
 		
 		
 	async def main():
-		task1 = asyncio.create_task(read_dump.Read_dump.get_dump(Filter_alert.snort_log_file, Filter_alert.updateLogFile)) #this gathers all the logs from network interface.
+		#task1 = asyncio.create_task(read_dump.Read_dump.get_dump(Filter_alert.snort_log_file, Filter_alert.updateLogFile)) #this gathers all the logs from network interface.
+		task1 = asyncio.create_task(read_dump.Read_dump.get_tcpdump(Filter_alert.tcpdump_log_file, Filter_alert.updateLogFile)) #this gathers all the logs from network interface.
 		task2 = asyncio.create_task(Filter_alert.get_alert_logs(Filter_alert.alert_log_file)) #this gathers all thr alert logs and stores it in alert_logs list.
 		task3 = asyncio.create_task(Filter_alert.filter_log()) #This helps us to filter out the alert logs from all the logs and stores it in to #filtered_logs list
 		task4 = asyncio.create_task(Filter_alert.show_logs_metadata())
@@ -111,9 +128,13 @@ class Filter_alert:
 		asyncio.run(Filter_alert.main())
 		
 class start_snort:
-	cmd1 = 'sudo snort -v -l /var/log/snort'
-	cmd2 = 'sudo snort -A full -c /etc/snort/snort.conf -l /var/log/snort'
+	preDate = datetime.datetime.now()
+	dump_fileName = 'tcplogs.'+ str(int(datetime.datetime.timestamp(preDate)))
+	Filter_alert.tcpdump_log_file = dump_fileName + '.pcap'
+	cmd1 = 'sudo tcpdump -i enp0s3 -vv -w '+Filter_alert.tcpdump_log_file
+	cmd2 = 'sudo snort -A fast -c /etc/snort/snort.conf -l /var/log/snort'
 	cmd3 = 'sudo ls /var/log/snort'
+	cmd4 = 'sudo ls '
 	
 	def packet_logger():
 		try:	
@@ -123,7 +144,7 @@ class start_snort:
 			print("Pressed CTRL-C")
 			temp.kill()
 		
-	def get_log_file():
+	def get_log_file():......
 		try:
 			temp = subprocess.Popen(start_snort.cmd3.split(' '), stdout = subprocess.PIPE)
 			output, err = temp.communicate()
@@ -142,6 +163,16 @@ class start_snort:
 			print("Pressed CTRL-C")
 			temp.kill()
 	
+	def get_tcpdumplog_file():
+		try:
+			temp = subprocess.Popen(start_snort.cmd4.split(' '), stdout = subprocess.PIPE)
+			output, err = temp.communicate()
+			Filter_alert.tcpdump_log_file = re.findall('tcplogs.\d*', output.decode('utf-8'))[-1]
+		except KeyboardInterrupt:
+			print("Pressed CTRL-C")
+			temp.kill()
+			
+			
 	def IDS():
 		try:
 			subprocess.Popen(start_snort.cmd2.split(' '))		
